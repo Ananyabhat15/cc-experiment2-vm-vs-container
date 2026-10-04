@@ -1,393 +1,811 @@
-# VM vs Container Performance Analysis
+# Performance Analysis of Virtual Machines and Containers
 
-## 1. Project Overview
 
-This project evaluates the performance differences between **Virtual Machines (VMs)** and **Containers** using three major system performance metrics:
-
-* CPU Performance
-* Memory Performance
-* Disk I/O Performance
-
-The objective is to understand the performance overhead introduced by virtualization and compare it with the lightweight virtualization approach used by containers.
+To experimentally compare the performance, resource utilization, application performance, and
+scalability of Virtual Machines (VMs) and Containers under identical workloads.
 
 ---
 
-## 2. Objective
+## Table of Contents
 
-The main objectives of this experiment are:
-
-1. Compare CPU performance between a VM and a container.
-2. Compare memory performance between a VM and a container.
-3. Compare disk I/O performance between a VM and a container.
-4. Measure the overhead introduced by each virtualization approach.
-5. Determine how closely containers perform compared with the underlying host system.
+1. [Abstract](#abstract)
+2. [Objectives](#objectives)
+3. [Architecture](#architecture)
+4. [Experimental Environment](#experimental-environment)
+5. [Hardware Configuration](#hardware-configuration)
+6. [Software Configuration](#software-configuration)
+8. [Setup Instructions](#setup-instructions)
+9. [Experiments](#experiments)
+    - [Baseline](#baseline-measurement)
+    - [CPU](#experiment-1--cpu-performance)
+    - [Memory](#experiment-2--memory-performance)
+    - [Disk I/O](#experiment-3--disk-io-performance)
+    - [Network](#experiment-4--network-performance)
+    - [FastAPI Application](#experiment-5--fastapi-application-performance)
+    - [Startup Time](#experiment-6--startup-time)
+    - [Scalability](#experiment-7--scalability)
+11. [Automation Scripts](#automation-scripts)
+12. [Result Collection (CSV)](#result-collection-csv)
+13. [Results](#results)
+14. [Statistical Analysis](#statistical-analysis)
+15. [VM vs Container Comparison](#vm-vs-container-comparison)
+16. [Discussion](#discussion)
+17. [Limitations](#limitations)
+19. [Reproduction Instructions](#reproduction-instructions)
+21. [Conclusion](#conclusion)
+22. [Final Project Structure](#final-project-structure)
 
 ---
 
-## 3. VM vs Container
+## Abstract
 
-### Virtual Machine
+Virtual Machines and containers are the two dominant ways of isolating and deploying workloads. VMs virtualize hardware and run a full guest operating system on top of a hypervisor; containers share the host kernel and isolate processes using namespaces and cgroups. This project measures how these differences show up in practice.
 
-A Virtual Machine virtualizes the hardware and runs a complete guest operating system.
+The same workloads are executed in both environments: CPU (prime computation), memory (block transfers), disk I/O (sequential and random read/write), network throughput, a FastAPI web application, startup time, and scalability under increasing load. Every experiment is repeated multiple times, raw outputs are preserved, results are processed into CSV files, analysed statistically with Python, and published with scripts and documentation so that the work is fully reproducible.
 
-```text
-Application
-     ↓
-Guest Operating System
-     ↓
-Virtual Hardware
-     ↓
-Hypervisor
-     ↓
-Host Operating System
-     ↓
-Physical Hardware
+
+## Objectives
+
+- Prepare a consistent and documented benchmarking environment for both VM and container.
+- Measure CPU, memory, disk, and network performance with industry-standard tools (Sysbench, fio, iperf3).
+- Evaluate real application behaviour using a FastAPI service under load (Apache Benchmark / wrk).
+- Compare environment and application startup times.
+- Study how each environment scales as workload increases.
+- Automate benchmark execution and process results with Pandas / Matplotlib.
+- Publish code, raw data, graphs, and documentation on GitHub.
+
+## Architecture
+
+```
+                 PERFORMANCE ANALYSIS
+                        │
+          ┌─────────────┴─────────────┐
+          │                           │
+    VIRTUAL MACHINE               CONTAINER
+ (VMware + Ubuntu guest)            (Docker)
+          │                           │
+          └─────────────┬─────────────┘
+                        │
+                  SAME WORKLOADS
+                        │
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+         CPU         Memory     Disk / Network
+                        │
+                        ▼
+                APPLICATION TEST
+                        │
+                        ▼
+                  FINAL ANALYSIS
 ```
 
-A VM requires its own operating system, which introduces additional CPU, memory, and storage overhead.
 
-### Container
 
-A container isolates applications while sharing the host operating system kernel.
+## Experimental Environment
 
-```text
-Application
-     ↓
-Container
-     ↓
-Host Operating System Kernel
-     ↓
-Physical Hardware
-```
+| Component | Choice |
+|---|---|
+| Host OS | Windows |
+| Hypervisor | VMware Workstation |
+| Guest OS | Ubuntu (24.04 LTS recommended) |
+| Container runtime | Docker |
+| Programming language | Python |
+| CPU / Memory benchmark | Sysbench |
+| Disk benchmark | fio |
+| Network benchmark | iperf3 |
+| API framework | FastAPI (served by Uvicorn) |
+| HTTP load tools | Apache Benchmark (`ab`), `wrk` (optional) |
+| Analysis | Pandas, Matplotlib, NumPy, Jupyter |
 
-Because containers do not require a separate guest operating system, they generally have lower resource overhead.
+## Hardware Configuration
 
----
+| Resource | VM | Container |
+|---|---|---|
+| CPU | 4 vCPU | `--cpus=4` |
+| Memory | 8 GB | `--memory=6g` |
+| Disk | 60 GB virtual disk | Dedicated benchmark directory mounted via `-v` |
+| Base OS | Ubuntu 24.04 LTS | `ubuntu:24.04` image |
+| Network | NAT or Bridged (fixed) | Documented Docker network mode |
 
-## 4. Performance Parameters
+## Software Configuration
 
-### 4.1 CPU Performance
-
-CPU performance measures how efficiently the VM or container performs computational workloads.
-
-Important metrics include:
-
-* Execution time
-* Events per second
-* CPU utilization
-* CPU latency
-
-Higher events per second and lower execution time generally indicate better CPU performance.
-
----
-
-### 4.2 Memory Performance
-
-Memory performance evaluates how efficiently the system performs memory operations.
-
-Metrics include:
-
-* Memory bandwidth
-* Memory latency
-* Read/write throughput
-* Memory utilization
-
-Higher memory bandwidth and lower latency indicate better memory performance.
+| Software | Version |
+|---|---|
+| Ubuntu | _to be filled_ |
+| Kernel (`uname -a`) | _to be filled_ |
+| Docker | _to be filled_ (`docker --version`) |
+| Sysbench | _to be filled_ |
+| fio | _to be filled_ |
+| iperf3 | _to be filled_ |
+| Python | _to be filled_ |
 
 ---
 
-### 4.3 Disk I/O Performance
+**Terminal rule**
 
-Disk I/O measures the performance of reading and writing data.
-
-The experiment considers:
-
-* Sequential read
-* Sequential write
-* Random read
-* Random write
-* IOPS
-* Throughput
-* Latency
-
-Higher throughput and IOPS, along with lower latency, indicate better storage performance.
-
----
-
-## 5. Experimental Setup
-
-The experiment uses equivalent resource configurations wherever possible.
-
-### VM
-
-* Virtualization: Virtual Machine
-* CPU: [Specify CPU allocation]
-* Memory: [Specify RAM]
-* Storage: [Specify disk configuration]
-* Operating System: [Specify OS]
-* Hypervisor: [Specify hypervisor]
-
-### Container
-
-* Container Technology: Docker
-* CPU Limit: [Specify CPU limit]
-* Memory Limit: [Specify memory limit]
-* Storage: [Specify storage configuration]
-* Base Image: [Specify image]
-
-### Host System
-
-* CPU: [Specify CPU]
-* RAM: [Specify RAM]
-* Storage: [Specify SSD/HDD]
-* Operating System: [Specify OS]
-
----
-
-## 6. Benchmark Tools
-
-The following tools can be used for the experiment:
-
-### CPU
+- Linux commands: run in the Ubuntu terminal inside VMware Workstation.
+- Docker commands: run in the terminal where Docker is installed.
+- Always start from the project root before using relative paths:
 
 ```bash
-sysbench cpu --cpu-max-prime=20000 run
+cd ~/vm-vs-container-performance
+pwd    # /home/<your-ubuntu-user>/vm-vs-container-performance
 ```
 
-### Memory
+**Performance difference formulas**
+
+For execution time (lower is better):
+
+```python
+difference = ((vm_time - container_time) / vm_time) * 100
+print(f"Performance difference: {difference:.2f}%")
+```
+
+For throughput (higher is better):
+
+```python
+difference = ((container_throughput - vm_throughput) / vm_throughput) * 100
+print(f"Throughput difference: {difference:.2f}%")
+```
+
+---
+
+## Setup Instructions
+
+### 1. Install benchmark tools (Ubuntu)
 
 ```bash
-sysbench memory --memory-total-size=10G run
+sudo apt update
+sudo apt install -y sysbench fio iperf3 htop iotop sysstat python3 python3-pip git
 ```
 
-### Disk I/O
+Verify:
 
 ```bash
-sysbench fileio --file-total-size=2G prepare
-sysbench fileio --file-total-size=2G --file-test-mode=seqwr run
-sysbench fileio --file-total-size=2G --file-test-mode=seqrd run
-sysbench fileio --file-total-size=2G cleanup
+sysbench --version
+fio --version
+iperf3 --version
+python3 --version
+git --version
 ```
 
-Docker can be used to execute the same benchmarks inside a container.
+### 2. Create the project directory
 
----
-
-## 7. Methodology
-
-The same benchmark workload is executed in both environments.
-
-### Step 1 — Configure the VM
-
-Create and configure the VM with a fixed number of CPU cores, memory, and storage.
-
-### Step 2 — Configure the Container
-
-Create a container with equivalent CPU and memory limits.
-
-### Step 3 — Run CPU Benchmark
-
-Execute the CPU benchmark multiple times and record:
-
-* Execution time
-* Events per second
-* CPU utilization
-
-### Step 4 — Run Memory Benchmark
-
-Execute the memory benchmark and record:
-
-* Memory throughput
-* Execution time
-* Memory bandwidth
-
-### Step 5 — Run Disk I/O Benchmark
-
-Execute sequential and random read/write tests and record:
-
-* Throughput
-* IOPS
-* Latency
-
-### Step 6 — Repeat the Experiments
-
-Each benchmark should preferably be repeated multiple times to reduce the effect of temporary system variations.
-
----
-
-## 8. Results
-
-The results can be recorded using the following format.
-
-### CPU Performance
-
-| Environment | Execution Time | Events/sec |
-| ----------- | -------------: | ---------: |
-| VM          |              — |          — |
-| Container   |              — |          — |
-
-### Memory Performance
-
-| Environment | Memory Throughput | Latency |
-| ----------- | ----------------: | ------: |
-| VM          |                 — |       — |
-| Container   |                 — |       — |
-
-### Disk I/O Performance
-
-| Environment | Read Throughput | Write Throughput | IOPS |
-| ----------- | --------------: | ---------------: | ---: |
-| VM          |               — |                — |    — |
-| Container   |               — |                — |    — |
-
----
-
-## 9. Performance Analysis
-
-The results are analyzed based on:
-
-### CPU
-
-Containers are expected to have CPU performance close to the host because they share the host kernel and do not require a complete guest operating system.
-
-VMs introduce additional virtualization overhead through virtual hardware and the hypervisor.
-
-### Memory
-
-Containers generally require less memory because they do not need a separate guest operating system.
-
-A VM requires memory for both the applications and the guest operating system.
-
-### Disk I/O
-
-Disk performance depends strongly on the storage driver, filesystem, caching, and VM virtual disk configuration.
-
-Containers can achieve performance close to the host when using an appropriate storage configuration. VM storage performance can be affected by additional virtualization and virtual-disk layers.
-
----
-
-## 10. Expected Outcome
-
-In a controlled experiment, containers are generally expected to show lower overhead and performance closer to the host system.
-
-The expected general relationship is:
-
-```text
-Performance
-
-Native Host
-     │
-     ├── Container
-     │
-     ├── Type-1 VM
-     │
-     └── Type-2 VM
+```bash
+mkdir -p ~/vm-vs-container-performance
+cd ~/vm-vs-container-performance
+mkdir -p docs results/raw results/processed results/figures scripts workloads docker api analysis
 ```
 
-However, the actual results depend on:
+### 3. Record hardware and software configuration
 
-* Hardware
-* Hypervisor
-* Container runtime
-* Storage technology
-* Filesystem
-* CPU allocation
-* Memory allocation
-* Disk configuration
-* Background processes
+```bash
+lscpu     > docs/cpu-info.txt
+free -h   > docs/memory-info.txt
+lsblk     > docs/storage-info.txt
+uname -a  > docs/kernel-info.txt
+docker --version
+docker info
+```
 
-Therefore, the experimental measurements should be used rather than assuming that one environment will always be faster for every workload.
+### 4. Create the VM environment
+
+In VMware Workstation: open the Ubuntu VM → *Edit virtual machine settings* → set **Processors = 4**, **Memory = 8 GB**, **Hard Disk = 60 GB**, **Network Adapter = NAT or Bridged** → Apply → Power on.
+
+Inside the VM:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y sysbench fio iperf3 htop sysstat python3 python3-pip git
+
+nproc        # confirm vCPUs
+free -h      # confirm memory
+lsblk
+df -h
+```
+
+Record the final settings:
+
+```bash
+cd ~/vm-vs-container-performance
+nano docs/vm-configuration.txt
+```
+
+### 5. Create the Docker environment
+
+```bash
+sudo apt update
+sudo apt install -y docker.io
+sudo systemctl enable --now docker
+
+docker --version
+sudo docker run --rm hello-world
+
+# run Docker without sudo (log out and back in afterwards)
+sudo usermod -aG docker $USER
+docker run --rm hello-world
+```
+
+**Controlled container run**
+```bash
+docker run --rm --cpus=4 --memory=8g vm-container-benchmark
+```
+
+### 6. Build the benchmark Docker image
+
+Create `docker/Dockerfile`:
+
+```dockerfile
+FROM ubuntu:24.04
+
+RUN apt-get update && \
+    apt-get install -y \
+        sysbench \
+        fio \
+        iperf3 \
+        python3 \
+        python3-pip \
+        procps \
+        sysstat && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /benchmark
+```
+
+Build from the project root (`-f` selects the Dockerfile, the final `.` is the build context):
+
+```bash
+cd ~/vm-vs-container-performance
+docker build -t vm-container-benchmark -f docker/Dockerfile .
+docker images
+docker run --rm -it vm-container-benchmark
+# inside the container:
+sysbench --version && fio --version && python3 --version
+```
 
 ---
 
-## 11. VM vs Container Comparison
+## Experiments
 
-| Feature              | Virtual Machine       | Container              |
-| -------------------- | --------------------- | ---------------------- |
-| Virtualization level | Hardware              | Operating-system level |
-| Guest OS             | Required              | Not required           |
-| Kernel               | Separate guest kernel | Shared host kernel     |
-| CPU overhead         | Generally higher      | Generally lower        |
-| Memory overhead      | Higher                | Lower                  |
-| Disk overhead        | Can be higher         | Usually lower          |
-| Startup time         | Higher                | Lower                  |
-| Isolation            | Strong                | Lightweight            |
-| Portability          | High                  | High                   |
-| Resource efficiency  | Lower                 | Higher                 |
+All commands below are run from the project root unless stated otherwise. Parameters are identical between VM and container.
+
+### Baseline Measurement
+
+Reference CPU measurement before VM-vs-container comparison.
+
+```bash
+mkdir -p results/raw/baseline
+sysbench cpu --cpu-max-prime=20000 --threads=4 --time=30 run > results/raw/baseline/cpu.txt
+```
 
 ---
 
-## 12. Advantages of Containers
+### Experiment 1 — CPU Performance
 
-* Lightweight
-* Fast startup
-* Lower memory overhead
-* Efficient resource utilization
-* Easy deployment
-* Good performance for many application workloads
-* Multiple containers can run on the same host efficiently
+| Item | Value |
+|---|---|
+| Tool | Sysbench |
+| Workload | Prime number calculation |
+| Threads | 1 / 2 / 4 / 8 |
+| Duration | 30 seconds |
+| Metrics | Events/sec, execution time |
+
+**VM (10 repetitions):**
+
+```bash
+mkdir -p results/raw/cpu/vm
+for i in {1..10}; do
+  sysbench cpu --cpu-max-prime=20000 --threads=4 --time=30 run \
+    > results/raw/cpu/vm/run$i.txt
+done
+```
+
+**Container (10 repetitions, with controlled limits):**
+
+```bash
+mkdir -p results/raw/cpu/container
+for i in {1..10}; do
+  docker run --rm --cpus=4 --memory=8g \
+    vm-container-benchmark \
+    sysbench cpu --cpu-max-prime=20000 --threads=4 --time=30 run \
+    > results/raw/cpu/container/run$i.txt
+done
+```
+
+**CPU scalability:**
+
+```bash
+for threads in 1 2 4 8; do
+  sysbench cpu --cpu-max-prime=20000 --threads=$threads --time=30 run
+done
+```
 
 ---
 
-## 13. Advantages of Virtual Machines
+### Experiment 2 — Memory Performance
 
-* Strong isolation
-* Complete guest operating system
-* Can run different operating systems
-* Useful for infrastructure virtualization
-* Suitable when kernel-level isolation is required
-* Mature virtualization ecosystem
+| Item | Value |
+|---|---|
+| Tool | Sysbench |
+| Workload | Memory operations (1M blocks, 10G total) |
+| Metrics | Operations/sec, throughput, latency |
+
+**VM (10 repetitions):**
+
+```bash
+mkdir -p results/raw/memory/vm
+for i in {1..10}; do
+  sysbench memory --memory-block-size=1M --memory-total-size=10G --threads=4 run \
+    > results/raw/memory/vm/run$i.txt
+done
+```
+
+**Container (10 repetitions):**
+
+```bash
+mkdir -p results/raw/memory/container
+for i in {1..10}; do
+  docker run --rm --cpus=4 --memory=8g \
+    vm-container-benchmark \
+    sysbench memory --memory-block-size=1M --memory-total-size=10G --threads=4 run \
+    > results/raw/memory/container/run$i.txt
+done
+```
+
+**Resource monitoring** (run in a second terminal while benchmarks execute):
+
+```bash
+htop            # or: vmstat 1
+docker stats    # for containers: CPU, memory, network I/O, block I/O
+```
 
 ---
 
-## 14. Conclusion
+### Experiment 3 — Disk I/O Performance
 
-This experiment compares VM and container performance using CPU, memory, and disk I/O benchmarks.
+| Item | Value |
+|---|---|
+| Tool | fio |
+| Operations | Read / Write |
+| Workloads | Sequential (1M blocks) / Random (4k blocks) |
+| Metrics | MB/s, IOPS, latency |
 
-Containers generally introduce less resource overhead because they share the host operating system kernel. VMs provide stronger isolation and complete operating-system environments but require additional resources for the guest OS and virtual hardware.
+Common parameters: `--size=2G --direct=1 --iodepth=16 --runtime=30 --time_based`
 
-The benchmark results provide a quantitative basis for understanding the performance trade-offs between the two virtualization approaches.
+**VM:**
+
+```bash
+mkdir -p ~/fio-test results/raw/disk
+
+# Sequential write
+fio --name=seq-write --filename=$HOME/fio-test/testfile --size=2G --bs=1M \
+    --rw=write --direct=1 --iodepth=16 --runtime=30 --time_based \
+    > results/raw/disk/seq-write.txt
+
+# Sequential read
+fio --name=seq-read --filename=$HOME/fio-test/testfile --size=2G --bs=1M \
+    --rw=read --direct=1 --iodepth=16 --runtime=30 --time_based \
+    > results/raw/disk/seq-read.txt
+
+# Random read
+fio --name=random-read --filename=$HOME/fio-test/testfile --size=2G --bs=4k \
+    --rw=randread --direct=1 --iodepth=16 --runtime=30 --time_based \
+    > results/raw/disk/random-read.txt
+
+# Random write
+fio --name=random-write --filename=$HOME/fio-test/testfile --size=2G --bs=4k \
+    --rw=randwrite --direct=1 --iodepth=16 --runtime=30 --time_based \
+    > results/raw/disk/random-write.txt
+```
+
+**Container** (host directory mounted into the container; document the storage path used):
+
+```bash
+mkdir -p ~/fio-test results/raw/disk-container
+
+# Sequential write
+docker run --rm -v $HOME/fio-test:/fio-test vm-container-benchmark \
+  fio --name=seq-write --filename=/fio-test/testfile --size=2G --bs=1M \
+      --rw=write --direct=1 --iodepth=16 --runtime=30 --time_based \
+  > results/raw/disk-container/seq-write.txt
+
+# Random read
+docker run --rm -v $HOME/fio-test:/fio-test vm-container-benchmark \
+  fio --name=random-read --filename=/fio-test/testfile --size=2G --bs=4k \
+      --rw=randread --direct=1 --iodepth=16 --runtime=30 --time_based \
+  > results/raw/disk-container/random-read.txt
+```
+
+Repeat the same pattern for `seq-read` and `random-write`.
 
 ---
 
-## 15. Repository Structure
+### Experiment 4 — Network Performance
 
-```text
-VM-vs-Container-Performance/
+| Item | Value |
+|---|---|
+| Tool | iperf3 |
+| Metrics | Throughput, retransmissions |
+| Test | Client ↔ Server |
+
+```bash
+mkdir -p results/raw/network
+
+# On the server
+iperf3 -s
+ip addr                                   # find the server IP
+
+# On the client
+iperf3 -c <SERVER-IP> -t 30 > results/raw/network/iperf3.txt
+iperf3 -c <SERVER-IP> -t 30 -P 4 > results/raw/network/iperf3-parallel4.txt
+```
+
+> Use the same client/server arrangement for VM and container tests, and document the network mode (NAT, bridged, host networking) because it changes results.
+
+---
+
+### Experiment 5 — FastAPI Application Performance
+
+A realistic application workload with three endpoints: `/health` (lightweight), `/compute` (CPU-bound), `/memory` (memory-bound).
+
+**`api/main.py`:**
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/compute")
+def compute():
+    total = 0
+    for i in range(1_000_000):
+        total += i * i
+    return {"result": total}
+
+@app.get("/memory")
+def memory():
+    data = [i for i in range(1_000_000)]
+    return {"elements": len(data)}
+```
+
+**Run in the VM:**
+
+```bash
+cd ~/vm-vs-container-performance/api
+python3 -m pip install fastapi uvicorn
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+# second terminal
+curl http://localhost:8000/health        # {"status":"healthy"}
+```
+
+**`api/requirements.txt`:**
+
+```
+fastapi
+uvicorn
+```
+
+**`api/Dockerfile`:**
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY main.py .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+**Build and run the container:**
+
+```bash
+cd ~/vm-vs-container-performance
+docker build -t performance-api -f api/Dockerfile api
+docker run --rm --cpus=4 --memory=8g -p 8000:8000 performance-api
+
+# second terminal
+curl http://127.0.0.1:8000/health
+```
+
+**Load testing:**
+
+```bash
+sudo apt install -y apache2-utils
+ab -n 10000 -c 100 http://127.0.0.1:8000/health
+ab -n 1000  -c 10  http://127.0.0.1:8000/compute
+
+# optional
+sudo apt install -y wrk
+wrk -t4 -c100 -d30s http://127.0.0.1:8000/health
+```
+
+Metrics: requests per second, time per request, failed requests, connection times. Use identical request counts and concurrency for VM and container.
+
+---
+
+### Experiment 6 — Startup Time
+
+```bash
+# Container startup
+time docker run --rm performance-api
+
+# More controlled test
+time docker run --rm -d --name startup-test -p 8000:8000 performance-api
+docker stop startup-test
+```
+
+Record for both environments (multiple repetitions):
+
+| | Environment started | Application ready |
+|---|---|---|
+| VM | _to be filled_ | _to be filled_ |
+| Container | _to be filled_ | _to be filled_ |
+
+---
+
+### Experiment 7 — Scalability
+
+Workload is increased in steps: **1 → 2 → 4 → 8**.
+
+**CPU scalability:**
+
+```bash
+for threads in 1 2 4 8; do
+  sysbench cpu --cpu-max-prime=20000 --threads=$threads --time=30 run
+done
+```
+
+**API scalability:**
+
+```bash
+wrk -t1 -c10  -d30s http://127.0.0.1:8000/health
+wrk -t2 -c50  -d30s http://127.0.0.1:8000/health
+wrk -t4 -c100 -d30s http://127.0.0.1:8000/health
+wrk -t4 -c200 -d30s http://127.0.0.1:8000/health
+```
+
+Record throughput, latency, CPU usage, and memory usage at each level.
+
+---
+
+## Automation Scripts
+
+Scripts keep benchmark parameters consistent and reduce manual errors. Example `scripts/run_cpu.sh`:
+
+```bash
+#!/bin/bash
+# Resolve paths relative to the project root, regardless of where the script is called from
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="$SCRIPT_DIR/../results/raw/cpu"
+mkdir -p "$OUTPUT_DIR"
+
+for threads in 1 2 4 8
+do
+  echo "Running CPU test with $threads threads"
+  sysbench cpu \
+    --cpu-max-prime=20000 \
+    --threads=$threads \
+    --time=30 \
+    run > "$OUTPUT_DIR/cpu_${threads}_threads.txt"
+done
+
+echo "CPU benchmark completed."
+```
+
+```bash
+chmod +x scripts/run_cpu.sh
+./scripts/run_cpu.sh
+```
+
+Equivalent scripts: `run_memory.sh`, `run_disk.sh`, `run_network.sh`, and `collect_metrics.py` for parsing raw output into CSV.
+
+## Result Collection (CSV)
+
+
+## Results
+
+
+### CPU Results
+
+| Threads | VM events/sec | Container events/sec | VM time (s) | Container time (s) |
+|---|---|---|---|---|
+| 1 | | | | |
+| 2 | | | | |
+| 4 | | | | |
+| 8 | | | | |
+
+_Figure: `results/figures/cpu_performance.png`, `results/figures/cpu_scalability.png`_
+
+### Memory Results
+
+| Metric | VM | Container |
+|---|---|---|
+| Operations/sec | | |
+| Throughput (MiB/s) | | |
+| Latency (ms) | | |
+
+### Disk I/O Results
+
+| Workload | Metric | VM | Container |
+|---|---|---|---|
+| Sequential read | MB/s | | |
+| Sequential write | MB/s | | |
+| Random read | IOPS | | |
+| Random write | IOPS | | |
+| All | Latency (µs/ms) | | |
+
+### Network Results
+
+| Metric | VM | Container |
+|---|---|---|
+| Throughput (Mbps), single stream | | |
+| Throughput (Mbps), 4 parallel streams | | |
+| Retransmissions | | |
+
+### Application (FastAPI) Results
+
+| Endpoint | Metric | VM | Container |
+|---|---|---|---|
+| /health | Requests/sec | | |
+| /health | Time per request (ms) | | |
+| /health | Failed requests | | |
+| /compute | Requests/sec | | |
+| /compute | Time per request (ms) | | |
+| /compute | Failed requests | | |
+
+### Startup-Time Results
+
+| Metric | VM | Container |
+|---|---|---|
+| Environment start (s) | | |
+| Application ready (s) | | |
+
+### Scalability Results
+
+| Workload level | VM | Container |
+|---|---|---|
+| CPU 1 / 2 / 4 / 8 threads | | |
+| API wrk 10 / 50 / 100 / 200 connections | | |
+
+---
+
+## Statistical Analysis
+
+Computed with Pandas from `results/processed/cpu_results.csv`:
+
+```python
+import pandas as pd
+
+df = pd.read_csv("results/processed/cpu_results.csv")
+
+summary = df.groupby("environment")["events_per_second"].agg(
+    ["mean", "median", "min", "max", "std"]
+)
+print(summary)
+```
+
+- **Mean**: average performance across repeated runs.
+- **Median**: reduces the influence of outliers.
+- **Standard deviation**: variability between runs.
+
+| Environment | Mean | Median | Min | Max | Std Dev |
+|---|---|---|---|---|---|
+| VM | | | | | |
+| Container | | | | | |
+
+## Graphs
+
+Generated by `scripts/analyze_results.py` and `scripts/generate_plots.py`, run from the project root:
+
+```bash
+pip install pandas matplotlib numpy jupyter
+python3 scripts/analyze_results.py
+python3 scripts/generate_plots.py
+```
+
+
+## VM vs Container Comparison
+
+| Metric | VM | Container | Difference |
+|---|---|---|---|
+| CPU Performance (events/sec) | | | |
+| Memory Usage / Throughput | | | |
+| Sequential Read (MB/s) | | | |
+| Sequential Write (MB/s) | | | |
+| Random Read (IOPS) | | | |
+| Random Write (IOPS) | | | |
+| Network Throughput (Mbps) | | | |
+| Startup Time (s) | | | |
+| API Requests/sec | | | |
+| API Latency (ms) | | | |
+
+## Discussion
+
+
+
+## Limitations
+
+
+
+## Reproduction Instructions
+
+1. Create the Ubuntu VM in VMware Workstation with fixed resources (4 vCPU, 8 GB RAM, 60 GB disk) and a fixed network mode.
+2. Install the tools: `sysbench fio iperf3 htop iotop sysstat python3 python3-pip git`, then Docker.
+3. Clone the repository:
+   ```bash
+   git clone <GITHUB-REPOSITORY-URL> ~/vm-vs-container-performance
+   cd ~/vm-vs-container-performance
+   ```
+4. Record the environment into `docs/` (`lscpu`, `free -h`, `lsblk`, `uname -a`, `docker info`).
+5. Build the images:
+   ```bash
+   docker build -t vm-container-benchmark -f docker/Dockerfile .
+   docker build -t performance-api -f api/Dockerfile api
+   ```
+6. Run the experiments in order: baseline → CPU → memory → disk → network → FastAPI → startup → scalability.
+7. Save raw output to `results/raw/`, build CSVs in `results/processed/`.
+8. Run the analysis scripts from the project root to produce tables and graphs in `results/figures/`.
+9. Fill in the Results, Discussion, and Conclusion sections.
+
+
+## Conclusion
+
+_To be written after all measurements and analysis are complete. The conclusion should be based strictly on the collected data, repeated runs, statistical analysis, and documented configuration, not on assumptions about which environment should perform better._
+
+## Final Project Structure
+
+```
+vm-vs-container-performance/
 │
 ├── README.md
+├── .gitignore
 │
-├── benchmarks/
+├── docs/
+│   ├── architecture.png
+│   ├── cpu-info.txt
+│   ├── memory-info.txt
+│   ├── storage-info.txt
+│   └── methodology.md
+│
+├── vm/
+│   ├── setup.sh
+│   └── benchmark.sh
+│
+├── docker/
+│   ├── Dockerfile
+│   └── benchmark.sh
+│
+├── api/
+│   ├── main.py
+│   ├── requirements.txt
+│   └── Dockerfile
+│
+├── workloads/
 │   ├── cpu/
 │   ├── memory/
-│   └── disk/
-│
-├── results/
-│   ├── vm/
-│   ├── container/
-│   └── comparison/
+│   ├── disk/
+│   └── network/
 │
 ├── scripts/
-│   ├── cpu_benchmark.sh
-│   ├── memory_benchmark.sh
-│   └── disk_benchmark.sh
+│   ├── run_cpu.sh
+│   ├── run_memory.sh
+│   ├── run_disk.sh
+│   ├── run_network.sh
+│   ├── collect_metrics.py
+│   ├── analyze_results.py
+│   └── generate_plots.py
 │
-├── graphs/
-│   ├── cpu_comparison.png
-│   ├── memory_comparison.png
-│   └── disk_io_comparison.png
+├── results/
+│   ├── raw/
+│   ├── processed/
+│   └── figures/
 │
-└── screenshots/
+└── analysis/
+    └── analysis.ipynb
 ```
-
-## 16. Technologies Used
-
-* Virtual Machines
-* Docker
-* Linux
-* Sysbench
-* CPU Benchmarking
-* Memory Benchmarking
-* Disk I/O Benchmarking
-* Shell Scripting
-* Data Analysis
