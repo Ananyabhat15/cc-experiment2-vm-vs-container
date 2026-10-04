@@ -765,13 +765,6 @@ python3 scripts/generate_plots.py
 | API Latency, /compute (ms) | 817.31 | 929.47 | Not reported |
 | API Latency, /memory (ms) | 608.50 | 694.62 | Not reported |
 
-## Discussion
-
-
-
-## Limitations
-
-
 
 ## Conclusion
 
