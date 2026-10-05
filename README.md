@@ -676,19 +676,27 @@ python3 scripts/analyze_results.py
 python3 scripts/generate_plots.py
 ```
 ## CPU Scalability
-<img width="4200" height="1500" alt="cpu_scalability" src="https://github.com/user-attachments/assets/d079a1f6-66bc-439f-b8c0-0712247c610b" />
+<img width="2560" height="960" alt="image" src="https://github.com/user-attachments/assets/06d3500d-d074-43b8-856f-740d5d877e39" />
+
 
 ## Memory Performance
-<img width="3900" height="1500" alt="memory_performance" src="https://github.com/user-attachments/assets/87532019-0845-4dc1-8f23-f1e8c4bafab6" />
+<img width="2560" height="960" alt="memory_performance" src="https://github.com/user-attachments/assets/f9107e47-924c-4047-a0b6-b45276310e6e" />
+
 
 ## Disk I/O Performance
-<img width="4200" height="1650" alt="disk_io_performance" src="https://github.com/user-attachments/assets/a27bf039-1d2f-40e2-93a8-eddff4058432" />
+<img width="2560" height="960" alt="image" src="https://github.com/user-attachments/assets/233e71b5-a67e-4142-bb64-7458b076ce5e" />
+
 
 ## Network Performance
-<img width="3900" height="1500" alt="network_performance" src="https://github.com/user-attachments/assets/f72bd26b-0798-4967-b1bd-afcd5c1efa82" />
+<img width="2560" height="960" alt="network_performance" src="https://github.com/user-attachments/assets/589946a5-ebbc-41ca-a5ec-68fa945ce496" />
+
 
 ## FastAPI Microservice Performance
-<img width="4200" height="1560" alt="fastapi_performance" src="https://github.com/user-attachments/assets/38f9382b-bc2a-4326-a209-84422ef7a576" />
+<img width="2560" height="960" alt="fastapi_performance" src="https://github.com/user-attachments/assets/e64c86b9-f51b-448e-9997-2cd0103b7356" />
+
+## Overall Performance
+<img width="2100" height="1950" alt="overall_performance_dashboard" src="https://github.com/user-attachments/assets/c7cee2af-2afb-48d7-b7f7-64ead880e317" />
+
 
 
 ## VM vs Container Comparison
