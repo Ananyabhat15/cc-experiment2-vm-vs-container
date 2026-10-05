@@ -26,10 +26,7 @@ scalability of Virtual Machines (VMs) and Containers under identical workloads.
     - [Scalability](#experiment-7--scalability)
 11. [Automation Scripts](#automation-scripts)
 13. [Results](#results)
-14. [Statistical Analysis](#statistical-analysis)
 15. [VM vs Container Comparison](#vm-vs-container-comparison)
-16. [Discussion](#discussion)
-17. [Limitations](#limitations)
 21. [Conclusion](#conclusion)
 22. [Final Project Structure](#final-project-structure)
 
@@ -539,12 +536,7 @@ time docker run --rm -d --name startup-test -p 8000:8000 performance-api
 docker stop startup-test
 ```
 
-Record for both environments (multiple repetitions):
 
-| | Environment started | Application ready |
-|---|---|---|
-| VM | _to be filled_ | _to be filled_ |
-| Container | _to be filled_ | _to be filled_ |
 
 ---
 
@@ -607,12 +599,12 @@ Equivalent scripts: `run_memory.sh`, `run_disk.sh`, `run_network.sh`, and `colle
 
 ### CPU Results
 
-| Threads | VM events/sec | Container events/sec | VM time (s) | Container time (s) |
-|---|---|---|---|---|
-| 1 | 515.84 | 517.19 | Not reported | Not reported |
-| 2 | 883.55 | 894.38 | Not reported | Not reported |
-| 4 | 928.17 | 900.45 | Not reported | Not reported |
-| 8 | 905.17 | 914.42 | Not reported | Not reported |
+| Threads | VM events/sec | Container events/sec |
+|---|---|---|
+| 1 | 515.84 | 517.19 | 
+| 2 | 883.55 | 894.38 | 
+| 4 | 928.17 | 900.45 | 
+| 8 | 905.17 | 914.42 | 
 
 Latency reported for the same runs:
 
@@ -656,7 +648,6 @@ Latency reported for the same runs:
 | Throughput, single stream, sender (Gbits/sec) | 14.1 | 13.7 |
 | Throughput, single stream, receiver (Gbits/sec) | 14.1 | 10.3 |
 | Data transferred (GBytes) | 49.3 | 47.9 |
-| Throughput, 4 parallel streams | Not reported | Not reported |
 | Retransmissions | 3 | 13 |
 
 ### Application (FastAPI) Results
@@ -679,8 +670,7 @@ The /compute values above are from run 2. Run 1 gave 12.01 req/sec and 832.81 ms
 
 | Metric | VM | Container |
 |---|---|---|
-| Environment start (s) | Not reported | Not reported |
-| Application ready (s) | Not reported | Not reported |
+| Application ready (s) | 40-50s | 0.663s |
 
 ### Scalability Results
 
@@ -690,33 +680,10 @@ The /compute values above are from run 2. Run 1 gave 12.01 req/sec and 832.81 ms
 | CPU 2 threads (events/sec) | 883.55 | 894.38 |
 | CPU 4 threads (events/sec) | 928.17 | 900.45 |
 | CPU 8 threads (events/sec) | 905.17 | 914.42 |
-| API wrk 10 / 50 / 100 / 200 connections | Not reported | Not reported |
 
 ---
 
-## Statistical Analysis
 
-Computed with Pandas from `results/processed/cpu_results.csv`:
-
-```python
-import pandas as pd
-
-df = pd.read_csv("results/processed/cpu_results.csv")
-
-summary = df.groupby("environment")["events_per_second"].agg(
-    ["mean", "median", "min", "max", "std"]
-)
-print(summary)
-```
-
-- **Mean**: average performance across repeated runs.
-- **Median**: reduces the influence of outliers.
-- **Standard deviation**: variability between runs.
-
-| Environment | Mean | Median | Min | Max | Std Dev |
-|---|---|---|---|---|---|
-| VM | | | | | |
-| Container | | | | | |
 
 ## Graphs
 
@@ -768,27 +735,15 @@ python3 scripts/generate_plots.py
 
 ## Conclusion
 
-This benchmark evaluation provides an empirical and architectural comparison between Virtual Machines and Docker Containers across compute, memory, storage, networking, and microservice application tiers:
+4. Conclusion
+This experiment compares VM and container performance using CPU, memory, and disk I/O benchmarks.
+Containers generally introduce less resource overhead because they share the host operating system kernel. VMs provide stronger isolation and complete operating-system environments but require additional resources for the guest OS and virtual hardware.
+The benchmark results provide a quantitative basis for understanding the performance trade-offs between the two virtualization approaches.
+CPU: containers run on the host kernel, so CPU speed is about the same as the VM.
+Disk: containers did better on reads and random I/O; the VM did better on sequential writes.
+Memory, network, app: the VM was faster here. For containers, the docker0 bridge, veth pair and NAT add a small cost (about 13 to 14% in the FastAPI test).
+Use containers for microservices, CI/CD and fast scaling. Use VMs when you need strong isolation or a different OS kernel.
 
-Compute Equivalence (Bare-Metal Instruction Execution):
-
-Sysbench CPU benchmark results demonstrate 
-<
-1
- variance across 1, 2, 4, and 8 threads.
-Because containers are native processes managed directly by the host Linux Completely Fair Scheduler (CFS), they avoid virtualization traps and binary translation overhead.
-Storage I/O Performance (Direct VFS vs Hypervisor Driver):
-
-Docker delivers +34.58% higher 4K random read IOPS (1,767 IOPS vs. 1,313 IOPS) and lower access latency (0.56 ms vs. 0.75 ms).
-Containers interact directly with the Linux Virtual File System (VFS) cache, while Virtual Machines incur guest OS filesystem translation and virtual SCSI controller interrupt emulation.
-Memory & Network Virtualization Overhead:
-
-VM direct loopback achieves higher memory write bandwidth and lower network latency with only 3 TCP retransmissions vs 13 on Docker.
-In containerized environments, packets traverse the docker0 bridge, veth pairs, and iptables NAT routing rules, resulting in a ~13–14% throughput overhead under high-concurrency HTTP load (FastAPI ApacheBench benchmarks).
-Strategic Workload Recommendations:
-
-Deploy Containers (Docker): When designing cloud-native microservices, horizontally scaling REST APIs, CI/CD runners, and applications demanding rapid elasticity, high deployment density, and maximum random I/O throughput.
-Deploy Virtual Machines (KVM / VMware): When running untrusted multi-tenant workloads requiring hardware-enforced hypervisor security boundaries, heterogeneous OS kernels (Linux, Windows, BSD), or legacy enterprise monoliths.
 
 ## Final Project Structure
 ```
