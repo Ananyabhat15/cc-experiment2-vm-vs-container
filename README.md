@@ -126,23 +126,6 @@ The same workloads are executed in both environments: CPU (prime computation), m
 cd ~/vm-vs-container-performance
 pwd    # /home/<your-ubuntu-user>/vm-vs-container-performance
 ```
-
-**Performance difference formulas**
-
-For execution time (lower is better):
-
-```python
-difference = ((vm_time - container_time) / vm_time) * 100
-print(f"Performance difference: {difference:.2f}%")
-```
-
-For throughput (higher is better):
-
-```python
-difference = ((container_throughput - vm_throughput) / vm_throughput) * 100
-print(f"Throughput difference: {difference:.2f}%")
-```
-
 ---
 
 ## Setup Instructions
