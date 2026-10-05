@@ -732,9 +732,7 @@ Use containers for microservices, CI/CD and fast scaling. Use VMs when you need 
 ```
 vm-vs-container-performance/
 │
-├── README.md                                  # Complete Experiment Documentation & Analysis
-├── LAB_REPORT.md                              # Formal Academic Laboratory Report
-├── .gitignore                                 # Git ignore configuration
+├── README.md                                  # Complete Experiment Documentation & Analysis             
 │
 ├── api/                                       # FastAPI Microservice
 │   ├── main.py                                # FastAPI application endpoints
@@ -774,7 +772,7 @@ vm-vs-container-performance/
 │   ├── 01_vm_baseline_profiling.jpeg
 │   ├── 02_container_baseline_profiling.jpeg
 │   ├── ...
-│   └── 34_api_raw_results_directory_listing.jpeg
+│   └── 38-docker startup test.jpeg
 │
 └── scripts/                                   # Automation & Analysis Scripts
     ├── run_cpu.sh                             # CPU benchmark automation
